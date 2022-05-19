@@ -5,10 +5,10 @@
 //  Created by Muhammad Ewaily on 18/05/2022.
 //
 
+import PassKit
 import UIKit
 
 class ViewController: UIViewController {
-    
     // Data Setup
     
     struct iPhone {
@@ -25,45 +25,56 @@ class ViewController: UIViewController {
     
     // Storyboard outlets
     
-    @IBOutlet weak var iPhonePickerView: UIPickerView!
-    @IBOutlet weak var priceLabel: UILabel!
-    
     
     @IBAction func buyiPhoneTapped(_ sender: UIButton) {
-        
         // Open Apple Pay purchase
+        let iPhone = iPhoneData[0]
+        let paymentItem = PKPaymentSummaryItem(label: iPhone.name, amount: NSDecimalNumber(value: iPhone.price))
+        let paymentNetworks = [PKPaymentNetwork.masterCard, .visa, .amex, .discover]
         
+        if PKPaymentAuthorizationViewController.canMakePayments(usingNetworks: paymentNetworks) {
+            let request = PKPaymentRequest()
+            request.currencyCode = "USD" // 1
+            request.countryCode = "US" // 2
+            request.merchantIdentifier = "merchant.com.ewaily.Apple-Pay-Prototype" // 3
+            request.merchantCapabilities = PKMerchantCapability.capability3DS // 4
+            request.supportedNetworks = paymentNetworks // 5
+            request.paymentSummaryItems = [paymentItem] // 6
+            
+            
+            guard let paymentVC = PKPaymentAuthorizationViewController(paymentRequest: request) else {
+                displayDefaultAlert(title: "Error", message: "Unable to present Apple Pay authorization.")
+                return
+            }
+            paymentVC.delegate = self
+            self.present(paymentVC, animated: true, completion: nil)
+            
+        } else {
+            displayDefaultAlert(title: "Error", message: "Unable to make Apple Pay transaction.")
+        }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        iPhonePickerView.delegate = self
-        iPhonePickerView.dataSource = self
-        
     }
     
+    func displayDefaultAlert(title: String?, message: String?) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alert.addAction(okAction)
+        self.present(alert, animated: true, completion: nil)
+    }
 }
 
-extension ViewController: UIPickerViewDataSource, UIPickerViewDelegate {
-    
-    // MARK: - Pickerview update
-    
-    
-    func numberOfComponents(in pickerView: UIPickerView) -> Int {
-        return 1
+extension ViewController: PKPaymentAuthorizationViewControllerDelegate {
+    func paymentAuthorizationViewControllerDidFinish(_ controller: PKPaymentAuthorizationViewController) {
+        dismiss(animated: true, completion: nil)
     }
-    
-    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
-        return iPhoneData.count
-    }
-    
-    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
-        return iPhoneData[row].name
-    }
-    
-    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
-        let priceString = String(format: "%.02f", iPhoneData[row].price)
-        priceLabel.text = "Price = $\(priceString)"
+
+    func paymentAuthorizationViewController(_ controller: PKPaymentAuthorizationViewController, didAuthorizePayment payment: PKPayment, handler completion: @escaping (PKPaymentAuthorizationResult) -> Void) {
+        dismiss(animated: true, completion: nil)
+        let vc = SuccessPaymentViewController()
+        vc.modalPresentationStyle = .fullScreen
+        self.present(vc, animated: true)
     }
 }
